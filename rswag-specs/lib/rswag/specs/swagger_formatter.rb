@@ -49,16 +49,29 @@ module Rswag
       def metadata_to_swagger(metadata)
         response_code = metadata[:response][:code]
         response = metadata[:response].reject { |k,v| k == :code }
+        swagger_doc = @config.get_swagger_doc(metadata[:swagger_doc])
 
         verb = metadata[:operation][:verb]
         operation = metadata[:operation]
-          .reject { |k,v| k == :verb }
-          .merge(responses: { response_code => response })
+                        .reject { |k,v| k == :verb }
+                        .tap {|x|
+                          if x[:parameters]
+                            x[:parameters].uniq!
+                            x[:parameters].reject! {|p|
+                              keys = []
+                              swagger_doc[:securityDefinitions].each {|dn, dk|
+                                keys << dk[:name]
+                              }
+                              keys.include?(p[:name])
+                            }
+                          end
+                        }
+                        .merge(responses: { response_code => response })
 
         path_template = metadata[:path_item][:template]
         path_item = metadata[:path_item]
-          .reject { |k,v| k == :template }
-          .merge(verb => operation)
+                        .reject { |k,v| k == :template }
+                        .merge(verb => operation)
 
         { paths: { path_template => path_item } }
       end
